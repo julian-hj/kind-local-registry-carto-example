@@ -1,0 +1,66 @@
+# Copyright 2021 VMware
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+#
+
+
+# `app-deploy` instantiates a `kapp-ctrl/App` making use of an image that comes
+# as input in the form of `$(images.image.image)$`.
+#
+# the use of `App` here is important because of how `knative` updates the
+# knative service under the hood to include some extra annotations that _can't_
+# be mutated once applied by knative's controller. As `kapp` is able to be
+# configured to not patch certain features (something `cartographer` can't
+# yet), we're able to bridge that gap with the use of `kapp-ctrl/App`.
+#
+#
+apiVersion: carto.run/v1alpha1
+kind: ClusterTemplate
+metadata:
+  name: app-deploy-to-statefulset
+spec:
+  template:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: $(workload.metadata.name)$
+      labels:
+        "fancy-label/workload-name": $(workload.metadata.name)$
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          "fancy-label/workload-name": $(workload.metadata.name)$
+      template:
+        metadata:
+          labels:
+            "fancy-label/workload-name": $(workload.metadata.name)$
+        spec:
+          imagePullSecrets:
+            - name: registry-credentials
+          containers:
+          - name: web
+            image: $(images.image.image)$
+            securityContext:
+              runAsUser: 1000
+            env:
+              - name: PORT
+                value: "8080"
+              - name: VCAP_APP_HOST
+                value: 0.0.0.0
+              - name: VCAP_APP_PORT
+                value: "8080"
+            ports:
+            - containerPort: 8080
+              name: web
